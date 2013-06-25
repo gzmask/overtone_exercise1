@@ -8,26 +8,33 @@
 
 (def one-twenty-bpm (metronome 120))
 
+
 (defn looper [nome sound]    
     (let [beat (nome)]
         (at (nome beat) (sound))
         (apply-at (nome (inc beat)) looper nome sound [])))
 
-;chords and scales
+(looper one-twenty-bpm kick)
+
+;sound synthesis. wave functions takes amplitude and frequency and outputs amplitude
+;thus these functions are manapulating with the outputs, with are amplitudes.
 (definst saw-wave [freq 440 attack 0.01 sustain 0.4 release 0.1 vol 0.4] 
   (* (env-gen (lin-env attack sustain release) 1 1 0 1 FREE)
      (saw freq)
+     (saw (- freq 220))
      vol))
 
 (definst sin-wave [freq 440 attack 0.01 sustain 0.4 release 0.1 vol 0.4] 
   (* (env-gen (lin-env attack sustain release) 1 1 0 1 FREE)
      (sin-osc freq)
+     (sin-osc (* freq 3))
      vol))
+(demo (sin-wave))
 
 (definst square-wave [freq 440 attack 0.01 sustain 0.4 release 0.1 vol 0.4] 
   (* (env-gen (lin-env attack sustain release) 1 1 0 1 FREE)
      (lf-pulse freq)
-     vol))
+    vol))
 
 (definst noisey [freq 440 attack 0.01 sustain 0.4 release 0.1 vol 0.4] 
   (* (env-gen (lin-env attack sustain release) 1 1 0 1 FREE)
@@ -112,8 +119,8 @@
       (let [time (metro (+ beat beat-num))] 
         (at time (play-chord2 (chord note :major) time)))))
 
-(play-scale1 [0   1  0.5 0.5 1   0.5 0.5 1   0.5 0.5 1   0.5 0.5 1    0.5  0.5 1   1   1   1]
-                [:c4 :g3 :a3 :b3 :a3 :g3 :e3 :e3 :g3 :b3 :a3 :g3 :f#3 :f#3 :g3 :a3 :b3 :g3 :e3 :e3]
+(play-scale1 [0   2   1    1   2   1   1   2   1   1   2   1    1    2    1  1   2   2   2   2]
+             [:c4 :g3 :a3 :b3 :a3 :g3 :e3 :e3 :g3 :b3 :a3 :g3 :f#3 :f#3 :g3 :a3 :b3 :g3 :e3 :e3]
              metro
              (metro))
 
