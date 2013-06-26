@@ -8,7 +8,6 @@
 
 (def one-twenty-bpm (metronome 120))
 
-
 (defn looper [nome sound]    
     (let [beat (nome)]
         (at (nome beat) (sound))
@@ -26,15 +25,18 @@
 
 (definst sin-wave [freq 440 attack 0.01 sustain 0.4 release 0.1 vol 0.4] 
   (* (env-gen (lin-env attack sustain release) 1 1 0 1 FREE)
-     (sin-osc freq)
-     (sin-osc (* freq 3))
+     (+ (sin-osc freq)
+        (sin-osc (* freq 2))
+        (sin-osc (* freq 4)))
      vol))
 (demo (sin-wave))
+(play-chord2 (chord :e4 :major) (now))
 
 (definst square-wave [freq 440 attack 0.01 sustain 0.4 release 0.1 vol 0.4] 
   (* (env-gen (lin-env attack sustain release) 1 1 0 1 FREE)
      (lf-pulse freq)
     vol))
+
 
 (definst noisey [freq 440 attack 0.01 sustain 0.4 release 0.1 vol 0.4] 
   (* (env-gen (lin-env attack sustain release) 1 1 0 1 FREE)
@@ -46,13 +48,17 @@
      (lf-tri freq)
      vol))
 
-(definst spooky-house [freq 440 width 0.2 
+(definst spooky-house [freq 440 width 0.15 
                          attack 0.3 sustain 4 release 0.3 
                          vol 0.4] 
   (* (env-gen (lin-env attack sustain release) 1 1 0 1 FREE)
-     (sin-osc (+ freq (* 20 (lf-pulse:kr 0.5 0 width))))
+     (sin-osc (+ freq (* 20 (lf-pulse:kr 1.5 0 width))))
      vol))
 
+(odoc lf-pulse:kr)
+;lf-pulse is a pulse oscillator. it generates signals such as 000000100000100000001, a.k.a pulse
+
+(spooky-house)
 ;(saw-wave 440)
 ;(saw-wave 523.25)
 ;(saw-wave 261.62) ; This is C4
@@ -83,7 +89,7 @@
 (defn play-chord2 [a-chord time]
       (doseq [[note timestamp] (map list a-chord [time (+ time 100) (+ time 200)])]
              (at timestamp (wave note))))
-
+(map list (chord :c4 :major) [(now) (+ (now) 100) (+ (now) 200)])
 (chord :c4 :major)
 (chord :c4 :minor)
 (play-chord2 (chord :c4 :major) (now))
