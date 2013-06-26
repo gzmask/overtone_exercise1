@@ -8,17 +8,20 @@
 (definst sin-wave [freq 440 attack 0.01 sustain 0.4 release 0.1 vol 0.4] 
   (* (env-gen (lin-env attack sustain release) 1 1 0 1 FREE)
      (+ (sin-osc freq)
-        (sin-osc (* freq 2))
         (sin-osc (* freq 4)))
      vol))
 
 (demo (sin-wave))
+; here, how I can read the fucking source code!
+(meta #'overtone.core/sin-osc)
+(meta #'overtone.core/saw)
 
 (defn wave [music-note]
     (sin-wave (midi->hz (note music-note))))
 
 (defn play-chord [a-chord]
   (doseq [note a-chord] (wave note)))
+(odoc meta)
 
 ;play-chord with delay
 (defn play-chord2 [a-chord time]
@@ -34,13 +37,13 @@
 
 (defn play-scale [beats notes metro beat-num]
   (doseq [[beat note] (map list beats notes)]
-    (at (metro (+ beat beat-num)) (play-chord2 (chord note :major) (metro (+ beat beat-num)))))
-)
-(play-scale [0   2   3   4   6   7   8   10   11 12  14  15  16   18   19  20  22  24  26  28]
-            [:c4 :g3 :a3 :b3 :a3 :g3 :e3 :e3 :g3 :b3 :a3 :g3 :f#3 :f#3 :g3 :a3 :b3 :g3 :e3 :e3]
+    (at (metro (+ beat beat-num)) (play-chord2 (chord note :major) (metro (+ beat beat-num))))))
+
+(play-scale [0    1   2   3   4   5   6   7   8   9   10  11  12  13  14  15  16  17   18   19  20  21  22  23  24  25  26  27  28  29]
+            [:c4 :c0 :g3 :a3 :b3 :b0 :a3 :g3 :g3 :e3 :e3 :g3 :g3 :b3 :a3 :g3 :g3 :f#3 :f#3 :g3 :g3 :a3 :a3 :b3 :b3 :g3 :g3 :e3 :e3 :e3]
             metro
             (metro))
-  
+
 (defn play-scale1 [beats notes metro beat-num]
     (doseq [[beat note] (map list (reductions + beats) notes)]
       (let [time (metro (+ beat beat-num))] 
