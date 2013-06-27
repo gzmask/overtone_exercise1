@@ -1,180 +1,104 @@
 (ns overtone-always.core 
-    (:use [overtone.core]))
+    (:use [overtone.live]))
 
-(boot-external-server)    ; boot an external server
-
-; learning my basic kicks
-(def kick (sample (freesound-path 2086)))
-
-(def one-twenty-bpm (metronome 120))
-
-(defn looper [nome sound]    
-    (let [beat (nome)]
-        (at (nome beat) (sound))
-        (apply-at (nome (inc beat)) looper nome sound [])))
-
-(looper one-twenty-bpm kick)
-
-;sound synthesis. wave functions takes amplitude and frequency and outputs amplitude
-;thus these functions are manapulating with the outputs, with are amplitudes.
-(definst saw-wave [freq 440 attack 0.01 sustain 0.4 release 0.1 vol 0.4] 
-  (* (env-gen (lin-env attack sustain release) 1 1 0 1 FREE)
-     (saw freq)
-     (saw (- freq 220))
-     vol))
-
-(definst sin-wave [freq 440 attack 0.01 sustain 0.4 release 0.1 vol 0.4] 
-  (* (env-gen (lin-env attack sustain release) 1 1 0 1 FREE)
-     (+ (sin-osc freq)
-        (sin-osc (* freq 2))
-        (sin-osc (* freq 4)))
-     vol))
-(demo (sin-wave))
-(play-chord2 (chord :e4 :major) (now))
-
-(definst square-wave [freq 440 attack 0.01 sustain 0.4 release 0.1 vol 0.4] 
-  (* (env-gen (lin-env attack sustain release) 1 1 0 1 FREE)
-     (lf-pulse freq)
-    vol))
+(comment)
+(demo (detuned-saw 40))
+(demo 10 (wobble (detuned-saw 40) 1))
+(demo 10 (wobble (sin-osc 220) 1))
+(odoc lpf)
 
 
-(definst noisey [freq 440 attack 0.01 sustain 0.4 release 0.1 vol 0.4] 
-  (* (env-gen (lin-env attack sustain release) 1 1 0 1 FREE)
-     (pink-noise) ; also have (white-noise) and others...
-     vol))
+(defcgen detuned-saw
+  "A detuned saw wave."
+  [freq {:default 40 :expands? true}]
+  (:ar (apply + (saw (* [0.99 1.01] freq)))))
+; this is a macro to define a cgen, some sort of oscillator
+; apply is, applying a funciton, add, to a list of items(vector)
+; the list of items are saw waves, which are formed of two channels
+; where the frequency of first is slightly lower than second, 0.99:1.01.
+; (:ar x) means the audio rate of this cgen is x. in this case, the summation of two saw waves
 
-(definst triangle-wave [freq 440 attack 0.01 sustain 0.1 release 0.4 vol 0.4] 
-  (* (env-gen (lin-env attack sustain release) 1 1 0 1 FREE)
-     (lf-tri freq)
-     vol))
-
-(definst spooky-house [freq 440 width 0.15 
-                         attack 0.3 sustain 4 release 0.3 
-                         vol 0.4] 
-  (* (env-gen (lin-env attack sustain release) 1 1 0 1 FREE)
-     (sin-osc (+ freq (* 20 (lf-pulse:kr 1.5 0 width))))
-     vol))
-
-(odoc lf-pulse:kr)
-;lf-pulse is a pulse oscillator. it generates signals such as 000000100000100000001, a.k.a pulse
-
-(spooky-house)
-;(saw-wave 440)
-;(saw-wave 523.25)
-;(saw-wave 261.62) ; This is C4
-;(saw-wave (midi->hz 69))
-;(saw-wave (midi->hz 72))
-;(saw-wave (midi->hz 60)) ; This is C4
-;(saw-wave (midi->hz (note :A4)))
-;(saw-wave (midi->hz (note :C5)))
-;(saw-wave (midi->hz (note :C4))) ; This is C4! Surprised?
-
-(defn note->hz [music-note]
-    (midi->hz (note music-note)))
+(defcgen wobble
+  "wobble the the input"
+  [in   {:doc "input source to wobble"
+         :default 0}
+   freq {:doc "wobble frequency"
+         :default 1}]
+  (:ar (let [sweep (lf-tri freq)
+             sweep (lin-exp sweep -1 1 40 3000)]
+         (lpf in sweep))))
+; the catch is the in argument has to be another cgen/oscillator
+; lf-tri: a non-band-limited triangle oscillator 
+; lin-exp: Convert from a linear range to an exponential range
+;         [in 0.0, srclo 0.0, srchi 1.0, dstlo 1.0, dsthi 2.0]
+;         in    - Input to convert 
+;         srclo - Lower limit of input range 
+;         srchi - Upper limit of input range 
+;         dstlo - Lower limit of output range 
+;         dsthi - Upper limit of output range 
+; so the final sweep is a wwwwww shape wave sweeping between 40 and 3000
+; lpf: a low pass filter which removes frequencies above a defined cut-off point
+; the final result is the lower part of the wwwwww shape wave, whatever the input is
 
 
-(defn wave [music-note]
-    (sin-wave (midi->hz (note music-note))))
 
-(defn a []
-  (do 
-    (wave :A4)
-    (wave :C5)
-    (wave :C4)))
 
-(defn play-chord [a-chord]
-  (doseq [note a-chord] (wave note)))
+(defcgen wobble-saw
+  "Generate a wobbly, detuned saw wave!"
+  [freq     {:doc "Main frequency"
+             :default 40}
+   wob-freq {:doc "Wobble frequency"
+             :default 0.5}]
+  (:ar (-> (detuned-saw freq)
+           (wobble wob-freq)
+           normalizer)))
 
-;play-chord with delay
-(defn play-chord2 [a-chord time]
-      (doseq [[note timestamp] (map list a-chord [time (+ time 100) (+ time 200)])]
-             (at timestamp (wave note))))
-(map list (chord :c4 :major) [(now) (+ (now) 100) (+ (now) 200)])
-(chord :c4 :major)
-(chord :c4 :minor)
-(play-chord2 (chord :c4 :major) (now))
-(play-chord (chord :c4 :minor))
+(defsynth dub-base-i [out-bus 0 bpm 140 wobble 6 note 30 v 2]
+ (let [trig (impulse:kr (/ bpm 140))
+       freq (midicps note)
+       swr (demand trig 0 (dseq [wobble] INF))
+       sweep (lin-exp (lf-tri swr) -1 1 40 3000)
+       wob (apply + (wobble-saw (* freq [0.99 1 1.01])))
+       wob (lpf wob sweep)
+       wob (* 0.9 (normalizer wob))
+       wob (+ wob (bpf wob 1500 2))
+       wob (+ wob (* 0.2 (g-verb wob 9 0.7 0.7)))]
 
-(defn chord-progression-time []
-  (let [time (now)]
-    (at time (play-chord (chord :C4 :major)))
-    (at (+ 1000 time) (play-chord (chord :G3 :major)))
-    (at (+ 2000 time) (play-chord (chord :F3 :sus4)))
-    (at (+ 3300 time) (play-chord (chord :F3 :major)))
-    (at (+ 4000 time) (play-chord (chord :G3 :major)))))
+   (out out-bus    (* v (clip2 (+ wob) 1)))))
 
-(def metro (metronome 200))
-(defn chord-progression-beat [m beat-num]
-  (at (m (+ 0 beat-num)) (play-chord (chord :C4 :major)))
-  (at (m (+ 4 beat-num)) (play-chord (chord :G3 :major)))
-  (at (m (+ 8 beat-num)) (play-chord (chord :A3 :minor)))
-  (at (m (+ 12 beat-num)) (play-chord (chord :F3 :major)))  
-)
+(defsynth dub-base-ii [out-bus 0 bpm 140 wobble 3 note 40  v 2]
+ (let [trig (impulse:kr (/ bpm 140))
+       freq (midicps note)
+       swr (demand trig 0 (dseq [wobble] INF))
+       sweep (lin-exp (lf-tri swr) -1 1 40 3000)
+       wob (apply + (saw (* freq [0.99 1.01])))
+       wob (lpf wob sweep)
+       wob (* 0.9 (normalizer wob))
+       wob (+ wob (bpf wob 1500 2))
+       wob (+ wob (* 0.2 (g-verb wob 9 0.7 0.7)))]
 
-(defn play-scale [beats notes metro beat-num]
-  (doseq [[beat note] (map list beats notes)]
-    (at (metro (+ beat beat-num)) (play-chord2 (chord note :major) (metro (+ beat beat-num)))))
-)
-(play-scale [0   2   3   4   6   7   8   10   11 12  14  15  16   18   19  20  22  24  26  28]
-            [:c4 :g3 :a3 :b3 :a3 :g3 :e3 :e3 :g3 :b3 :a3 :g3 :f#3 :f#3 :g3 :a3 :b3 :g3 :e3 :e3]
-            metro
-            (metro))
-  
-(defn play-scale1 [beats notes metro beat-num]
-    (doseq [[beat note] (map list (reductions + beats) notes)]
-      (let [time (metro (+ beat beat-num))] 
-        (at time (play-chord2 (chord note :major) time)))))
+   (out out-bus    (* v (clip2 (+ wob) 1)))))
 
-(play-scale1 [0   2   1    1   2   1   1   2   1   1   2   1    1    2    1  1   2   2   2   2]
-             [:c4 :g3 :a3 :b3 :a3 :g3 :e3 :e3 :g3 :b3 :a3 :g3 :f#3 :f#3 :g3 :a3 :b3 :g3 :e3 :e3]
-             metro
-             (metro))
+(defn ugen-cents
+  "Returns a frequency computed by adding n-cents to freq.  A cent is a
+  logarithmic measurement of pitch, where 1-octave equals 1200 cents."
+  [freq n-cents]
+  (with-overloaded-ugens
+    (* freq (pow 2 (/ n-cents 1200)))))
 
-(odoc let)
-(= [[1 1] [2 2] [3 3]] (map list [1 2 3] [1 2 3]))
+(definst rise-fall-pad [freq 440 split -5 t 4]
+  (let [f-env (env-gen (perc t t) 1 1 0 1 FREE)]
+    (rlpf (* 0.3 (saw [freq (ugen-cents freq split)]))
+          (+ (* 0.6 freq) (* f-env 2 freq)) 0.2)))
 
-(= '(1 2 3) [1 2 3])
+(definst resonant-pad [freq 440 split -5 t 4 lfo 0.5 depth 10]
+  (let [f-env (env-gen (perc t t) 1 1 0 1 FREE)
+        lfo (* depth (sin-osc:kr lfo))]
+    (rlpf (* 0.3 (+ (square freq) (lf-tri (+ lfo (ugen-cents freq split)))))
+          (+ (* 0.8 freq) (* f-env 2 freq)) 3/4)))
 
-(defn play-scale2 [beat-notes metro beat-num]
-  (doseq [[beat note] beat-notes]
-    (at (metro (+ beat beat-num)) (play-chord (chord note :major))))
-)
-(play-scale2 [[0 :c4] [2 :g3] [3 :a3] [4 :b3] [6 :a3] [7 :g3]]
-             metro
-             (metro))
+(defsynth plop [freq 440 len 0.4]
+  (* 0.4 (env-gen (perc 0.02 len) 1 1 0 1 FREE)
+     (sin-osc [(+ (* 3 (sin-osc 20)) freq) (/ freq 2)])))
 
-(defn play-scale3 [beat-notes metro beat-num]
-  (doseq [[beat note] (partition 2 beat-notes)]
-    (at (metro (+ beat beat-num)) (play-chord2 (chord note :major) (metro (+ beat beat-num)))))
-)
-(play-scale3 [0 :c4 2 :g3 3 :a3 4 :b3 6 :a3 7 :g3 8 :e3 10 :e3 11 :g3 12 :b3 14 :a3 15 :g3 16 :f#3 18 :f#3 19 :g3 20 :a3 22 :b3 24 :g3 26 :e3 28 :e3]
-             metro
-             (metro))
-
-  
-
-(defn ray-beat [m b]
-    (at (m (+ 0 b)) (play-chord (chord :c4 :major)))
-    (at (m (+ 2 b)) (play-chord (chord :g3 :major)))
-    (at (m (+ 3 b)) (play-chord (chord :a3 :major)))
-    (at (m (+ 4 b)) (play-chord (chord :b3 :major)))
-    (at (m (+ 6 b)) (play-chord (chord :a3 :major)))
-    (at (m (+ 7 b)) (play-chord (chord :g3 :major)))
-    (at (m (+ 8 b)) (play-chord (chord :e3 :major)))
-    (at (m (+ 10 b)) (play-chord (chord :e3 :major)))
-    (at (m (+ 11 b)) (play-chord (chord :g3 :major)))
-    (at (m (+ 12 b)) (play-chord (chord :b3 :major)))
-    (at (m (+ 14 b)) (play-chord (chord :a3 :major)))
-    (at (m (+ 15 b)) (play-chord (chord :g3 :major)))
-    (at (m (+ 16 b)) (play-chord (chord :f#3 :major)))
-    (at (m (+ 18 b)) (play-chord (chord :f#3 :major)))
-    (at (m (+ 19 b)) (play-chord (chord :g3 :major)))
-    (at (m (+ 20 b)) (play-chord (chord :a3 :major)))
-    (at (m (+ 22 b)) (play-chord (chord :b3 :major)))
-    (at (m (+ 24 b)) (play-chord (chord :g3 :major)))
-    (at (m (+ 26 b)) (play-chord (chord :e3 :major)))
-    (at (m (+ 28 b)) (play-chord (chord :e3 :major)))
-    (apply-at (m (+ 32 b)) ray-beat m (+ 32 b) []))
-(ray-beat metro (metro))
-(looper one-twenty-bpm kick)
 (stop)
