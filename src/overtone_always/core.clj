@@ -1,7 +1,9 @@
-(comment "repls")
+(comment "repls"
 (metro-bpm metro 100);lol not a good idea to set it higher than 10000
-(play-base (metro))
+(play-hat (metro))
+(play-kick (metro))
 (metro)
+)
 
 (ns overtone-always.core 
     (:use [overtone.live]))
@@ -18,7 +20,6 @@
         src (sin-osc freq-env)
         drum (+ sqr (* env src))]
     (compander drum drum 0.2 1 0.1 0.01 0.01)))
-(odoc compander)
 
 (definst c-hat [amp 0.8 t 0.04]
   (let [env (env-gen (perc 0.001 t) 1 1 0 1 FREE)
@@ -29,10 +30,12 @@
 
 (def metro (metronome 120))
 
-(defn play-base [beat]
-  (at (metro beat) (kick))
+(defn play-hat [beat]
   (at (metro (+ 0.25 beat)) (c-hat))
-  (at (metro (+ 0.5 beat)) (tone :note 50 :dur 0.6))
-  (apply-at (metro (+ 1 beat)) #'play-base (+ 1 beat) []))
+  (apply-at (metro (+ 1 beat)) #'play-hat (+ 1 beat) []))
+
+(defn play-kick [beat]
+  (at (metro beat) (kick))
+  (apply-at (metro (+ 1 beat)) #'play-kick (+ 1 beat) []))
 
 (stop)
