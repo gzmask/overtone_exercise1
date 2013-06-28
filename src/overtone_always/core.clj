@@ -1,6 +1,9 @@
 (comment "repls")
 (dub-base-i :note 25)
-(dub-base-ii :note 45)
+(dub-base-ii :note 25)
+(kill dub-base-i)
+(kill dub-base-ii)
+(ctl dub-base-ii :note 38)
 (demo 10 (wobble-saw))
 (demo 10 (wobble (sin-osc 220) 1))
 (demo 10 (wobble (detuned-saw 40) 1))
@@ -59,7 +62,7 @@
 ; the threading macro means (normalizer (wobble (detuned-saw freq) wob-freq))
 ; normalizer: normals the signal (wobble (detuned-saw freq) wob-freq) to 1.0 and -1.0 amplitutde
 
-(defsynth dub-base-i [out-bus 0 bpm 140 wobble 6 note 30 v 2]
+(definst dub-base-i [out-bus 0 bpm 140 wobble 6 note 30 v 2]
  (let [trig (impulse:kr (/ bpm 140))
        freq (midicps note)
        swr (demand trig 0 (dseq [wobble] INF))
@@ -69,9 +72,9 @@
        wob (* 0.9 (normalizer wob))
        wob (+ wob (bpf wob 1500 2))
        wob (+ wob (* 0.2 (g-verb wob 9 0.7 0.7)))]
-   (out out-bus (* v (clip2 (+ wob) 1)))))
+   (* v (clip2 (+ wob) 1))))
 
-(defsynth dub-base-ii [out-bus 0 bpm 140 wobble 3 note 40  v 2]
+(definst dub-base-ii [out-bus 0 bpm 140 wobble 3 note 40  v 2]
  (let [trig (impulse:kr (/ bpm 140))
        freq (midicps note)
        swr (demand trig 0 (dseq [wobble] INF))
@@ -81,7 +84,7 @@
        wob (* 0.9 (normalizer wob))
        wob (+ wob (bpf wob 1500 2))
        wob (+ wob (* 0.2 (g-verb wob 9 0.7 0.7)))]
-   (out out-bus (* v (clip2 (+ wob) 1)))))
+   (* v (clip2 (+ wob) 1))))
 
 (defn ugen-cents
   "Returns a frequency computed by adding n-cents to freq.  A cent is a
