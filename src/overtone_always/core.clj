@@ -1,9 +1,15 @@
 (comment "repls")
-(c-hat)
-(kick)
+(metro-bpm metro 100);lol not a good idea to set it higher than 10000
+(play-base (metro))
+(metro)
 
 (ns overtone-always.core 
     (:use [overtone.live]))
+
+(definst tone [note 60 amp 0.6 dur 0.4]
+  (let [snd (sin-osc (midicps note))
+        env (env-gen (perc 0.01 dur) :action FREE)]
+    (* env snd amp)))
 
 (definst kick [freq 120 dur 0.3 width 0.5]
   (let [freq-env (* freq (env-gen (perc 0 (* 0.99 dur))))
@@ -22,14 +28,11 @@
     (* amp env filt)))
 
 (def metro (metronome 120))
-(metro)
-(metro 120)
 
-(defn play [beat]
+(defn play-base [beat]
   (at (metro beat) (kick))
-  (at (metro (+ 0.5 beat)) (c-hat))
-  (apply-at (metro (+ 1 beat)) #'play (+ 1 beat) []))
-(play (metro))
-(odoc ctl)
+  (at (metro (+ 0.25 beat)) (c-hat))
+  (at (metro (+ 0.5 beat)) (tone :note 50 :dur 0.6))
+  (apply-at (metro (+ 1 beat)) #'play-base (+ 1 beat) []))
 
 (stop)
